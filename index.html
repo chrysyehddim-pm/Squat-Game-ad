@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>金幣深蹲王 - AR 互動挑戰</title>
+    <link rel="stylesheet" href="style.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+
+    <style>
+        /* --- 虛擬排行榜樣式 --- */
+        .result-percentile {
+            font-size: 1.1rem;
+            color: #333;
+            margin: 10px 0 20px 0;
+            font-weight: bold;
+            text-align: center;
+        }
+        .result-percentile span {
+            font-size: 1.8rem;
+            color: #e76f51; /* 強調色 */
+        }
+
+        /* --- 社群分享按鈕樣式 --- */
+        .share-container {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .btn-share {
+            flex: 1;
+            padding: 12px 0;
+            font-size: 1rem;
+            border-radius: 25px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            font-weight: bold;
+            color: white;
+            border: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+            transition: transform 0.2s;
+        }
+        .btn-share:active { transform: scale(0.95); }
+        .btn-line { background-color: #06C755; }
+        .btn-fb { background-color: #1877F2; }
+
+        /* --- 情境導購廣告 Banner 樣式 --- */
+        .ad-banner {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 12px;
+            margin: 15px 0 20px 0;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            text-align: left;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+            border: 1px solid #f0f0f0;
+            transition: transform 0.2s;
+            box-sizing: border-box;
+        }
+        .ad-banner:active { transform: scale(0.98); }
+        .ad-banner::before {
+            content: "贊助";
+            position: absolute; top: 0; right: 0;
+            background: #eee; color: #888; font-size: 0.7rem;
+            padding: 3px 8px; border-bottom-left-radius: 8px;
+        }
+        .ad-img {
+            width: 75px; height: 75px;
+            border-radius: 12px;
+            object-fit: cover;
+            flex-shrink: 0;
+        }
+        .ad-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+        .ad-title {
+            margin: 0 0 4px 0;
+            font-size: 1.05rem;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        .ad-desc {
+            margin: 0 0 8px 0;
+            font-size: 0.85rem;
+            color: #7f8c8d;
+            line-height: 1.3;
+        }
+        .ad-cta {
+            background: #e76f51; color: white;
+            padding: 5px 12px; border-radius: 15px;
+            font-size: 0.85rem; font-weight: bold;
+            border: none; width: fit-content;
+            box-shadow: 0 2px 8px rgba(231, 111, 81, 0.3);
+        }
+    </style>
+</head>
+<body>
+  <div class="container">
+      
+      <div id="screen-login" class="screen active">
+          <h1>🏆 金幣深蹲王</h1>
+          <p class="subtitle">健康挑戰等您參與</p>
+          <div class="form-group">
+              <label for="userName">姓名 / 暱稱</label>
+              <input type="text" id="userName" placeholder="請輸入姓名">
+          </div>
+          <div class="form-group">
+              <label for="userAge">年齡</label>
+              <input type="number" id="userAge" placeholder="請輸入年齡">
+          </div>
+          <button id="btn-to-intro" class="primary-btn">下一步</button>
+      </div>
+
+      <div id="screen-intro" class="screen hidden">
+        <h2>遊戲說明 📖</h2>
+        <div class="instruction-box">
+            <p>1. 將手機或平板架好，退後至全身入鏡。</p>
+            <p>2. 聽到提示音後開始深蹲。</p>
+            <p>3. 蹲下再站起，用頭頂破上方磚塊收集金幣！</p>
+            <button id="btn-play-instruction" class="secondary-btn" style="margin-top: 10px; font-size: 1rem; padding: 10px; background-color: #4CAF50; color: white; border: none; border-radius: 10px; cursor: pointer;">🔊 播放語音說明</button>
+        </div>
+        <button id="btn-start-game" class="primary-btn">我準備好了，開始連線鏡頭</button>
+    </div>
+
+      <div id="screen-game" class="screen hidden">
+          <div id="game-ui-bar">
+              <div class="stat">⏱️ <span id="time">30</span>s</div>
+              <div class="stat">🪙 <span id="score">0</span></div>
+              <div class="stat">🏃 <span id="reps">0</span> 下</div>
+          </div>
+          <div class="video-container">
+              <video id="input_video" style="display: none;"></video>
+              <canvas id="output_canvas"></canvas>
+              <img id="img-brick" src="images/block.png" style="display:none;">
+              <img id="img-coin" src="images/coin.png" style="display:none;">
+          </div>
+          <div id="status-bar">正在開啟鏡頭...</div>
+      </div>
+
+      <div id="screen-result" class="screen hidden">
+        <h2>🎉 挑戰完成！</h2>
+        <div class="result-card">
+            <h3 id="result-name">使用者名稱</h3>
+            <h1 id="result-title">傳說級深蹲王 👑</h1>
+            <p>總共完成：<span id="result-reps" class="highlight">0</span> 下</p>
+            <p>獲得金幣：<span id="result-score" class="highlight">0</span> 枚</p>
+            
+            <hr style="border: 0.5px solid #eee; margin: 15px 0;">
+
+            <div class="result-percentile">
+                🔥 太厲害了！您比同年齡層 <br>
+                <span id="percentile-value">--</span>% 的人表現更優秀！
+            </div>
+
+            <div class="share-container">
+                <button class="btn-share btn-line" onclick="shareToLine()">
+                    💬 炫耀到 LINE
+                </button>
+                <button class="btn-share btn-fb" onclick="shareToFB()">
+                    👍 分享到 FB
+                </button>
+            </div>
+
+            <div class="ad-banner" onclick="alert('導航至：專屬保健品優惠購買頁面')">
+                <img src="https://images.unsplash.com/photo-1550565118-3a14e8d0386f?ixlib=rb-4.0.3&auto=format&fit=crop&w=150&q=80" alt="保健品" class="ad-img">
+                <div class="ad-content">
+                    <h4 class="ad-title">深蹲卡卡？保護關鍵力 🏃‍♂️</h4>
+                    <p class="ad-desc">專屬 35+ 歲的 UC-II 靈活配方，一天一錠，讓你深蹲不卡關。</p>
+                    <button class="ad-cta">領取專屬優惠 ➔</button>
+                </div>
+            </div>
+            
+            <div style="font-size: 1rem; color: #555; text-align: left;">
+                <p>📊 <b>健康數據分析：</b></p>
+                <p>最深彎曲角度：<span id="result-min-angle">0</span>°</p>
+                <p>站立伸直角度：<span id="result-max-angle">0</span>°</p>
+                <p>平均單次耗時：<span id="result-avg-time">0</span> 秒</p>
+            </div>
+        </div>
+        <button id="btn-play-again" class="primary-btn">再挑戰一次</button>
+    </div>
+
+  </div>
+
+  <script type="module" src="script.js"></script>
+
+  <script>
+      // 監聽結算畫面 (#screen-result) 的 class 變化
+      // 當遊戲結束、畫面顯示時，自動產生隨機百分比，不干擾您的 script.js
+      const resultScreen = document.getElementById('screen-result');
+      
+      const observer = new MutationObserver((mutations) => {
+          mutations.forEach((mutation) => {
+              if (mutation.attributeName === 'class') {
+                  const isHidden = resultScreen.classList.contains('hidden');
+                  
+                  // 當 hidden class 被移除，代表進入結算畫面
+                  if (!isHidden) {
+                      // 取得畫面上顯示的深蹲次數
+                      const repsText = document.getElementById('result-reps').innerText;
+                      const reps = parseInt(repsText) || 0;
+
+                      // 依照次數給予動態的 PR 值 (假資料邏輯)
+                      let percentile = 50;
+                      if (reps >= 25) percentile = Math.floor(Math.random() * 5) + 95;      // 95-99%
+                      else if (reps >= 15) percentile = Math.floor(Math.random() * 10) + 80; // 80-89%
+                      else if (reps >= 10) percentile = Math.floor(Math.random() * 20) + 60; // 60-79%
+                      else if (reps > 0) percentile = Math.floor(Math.random() * 20) + 30;   // 30-49%
+                      else percentile = 10;
+
+                      document.getElementById('percentile-value').innerText = percentile;
+                      window.currentPercentile = percentile; // 存入全域變數供分享使用
+                  }
+              }
+          });
+      });
+
+      // 開始觀察
+      observer.observe(resultScreen, { attributes: true });
+
+      // --- 社群分享功能 ---
+      window.shareToLine = function() {
+          const reps = document.getElementById('result-reps').innerText || 0;
+          const pct = window.currentPercentile || 85;
+          const text = `我在「金幣深蹲王」完成了 ${reps} 下深蹲，腿力擊敗了同年齡層 ${pct}% 的人！快來挑戰你的大腿極限！🦵✨`;
+          const url = encodeURIComponent(window.location.href);
+          window.open(`https://line.me/R/msg/text/?${encodeURIComponent(text)}%0A${url}`, '_blank');
+      };
+
+      window.shareToFB = function() {
+          const url = encodeURIComponent(window.location.href);
+          window.open(`https://www.facebook.com/sharer/sharer.php?u=${url}`, '_blank');
+      };
+  </script>
+</body>
+</html>
