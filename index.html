@@ -12,6 +12,22 @@
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
 
     <style>
+        /* --- 修正：解決結算畫面內容過多無法滾動的問題 --- */
+        #screen-result:not(.hidden) {
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: flex-start !important; /* 讓內容由上往下排，避免頭尾被截斷 */
+            overflow-y: auto !important;            /* 強制開啟垂直滾動 */
+            max-height: 100dvh !important;          /* 最大高度為當前裝置螢幕高度 */
+            padding-bottom: 60px !important;        /* 底部多留一些空白，避免按鈕貼齊底緣 */
+            box-sizing: border-box !important;
+            -webkit-overflow-scrolling: touch;      /* 讓 iOS 滾動更加滑順 */
+        }
+        
+        #screen-result h2 {
+            margin-top: 30px; /* 頂部留點呼吸空間 */
+        }
+
         /* --- 虛擬排行榜樣式 --- */
         .result-percentile {
             font-size: 1.1rem;
@@ -195,7 +211,7 @@
                 <p>平均單次耗時：<span id="result-avg-time">0</span> 秒</p>
             </div>
         </div>
-        <button id="btn-play-again" class="primary-btn">再挑戰一次</button>
+        <button id="btn-play-again" class="primary-btn" style="margin-bottom: 20px;">再挑戰一次</button>
     </div>
 
   </div>
